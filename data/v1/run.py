@@ -24,6 +24,20 @@ def get_output_dir() -> pathlib.Path:
 	return out_dir
 
 
+def get_animals_file() -> pathlib.Path:
+	root = get_project_root()
+	return root / "data" / "v1" / "animals.json"
+
+
+def get_common_animals_file() -> pathlib.Path:
+	# Use filtered common animals produced by filter.py
+	return get_output_dir() / "animals_common.json"
+
+
+def get_animals_db_path() -> pathlib.Path:
+	return get_output_dir() / "animals_db.json"
+
+
 def get_objects() -> List[str]:
 	return [
 		"cat",
@@ -111,6 +125,21 @@ def extract_openscad_code_blocks(text: str) -> List[str]:
 	return blocks
 
 
+def read_animals_list() -> List[str]:
+	path = get_common_animals_file()
+	if not path.exists():
+		raise RuntimeError("animals_common.json not found; run filter.py first.")
+	text = path.read_text(encoding="utf-8").strip()
+	if not text:
+		raise RuntimeError("animals_common.json is empty; expected a JSON array of animal names.")
+	data = json.loads(text)
+	if not isinstance(data, list) or not all(isinstance(x, str) for x in data):
+		raise RuntimeError("animals_common.json must be a JSON array of strings (animal names).")
+	if not data:
+		raise RuntimeError("animals_common.json contains no entries.")
+	return data
+
+
 def write_outputs(object_name: str, raw_text: str, code_blocks: List[str]) -> Tuple[pathlib.Path, List[pathlib.Path]]:
 	out_root = get_output_dir() / object_name
 	out_root.mkdir(parents=True, exist_ok=True)
@@ -149,6 +178,48 @@ def write_openscad_outputs(object_name: str, three_timestamp: str, raw_text: str
 	return raw_path, written
 
 
+def build_animals_database(animals: List[str]) -> Tuple[pathlib.Path, List[dict]]:
+	# Progressive DB: append new entries, skip duplicates by name
+	db_path = get_animals_db_path()
+	if db_path.exists():
+		try:
+			existing = json.loads(db_path.read_text(encoding="utf-8"))
+		except Exception:
+			existing = []
+	else:
+		existing = []
+
+	if not isinstance(existing, list):
+		existing = []
+
+	name_to_index = {str(item.get("name")): idx for idx, item in enumerate(existing) if isinstance(item, dict) and "name" in item}
+
+	for name in animals:
+		# Skip if already present
+		if name in name_to_index:
+			continue
+		try:
+			user_prompt = build_user_prompt(name)
+			three_resp = request_model_completion(build_system_prompt(), user_prompt)
+			js_blocks = extract_js_code_blocks(three_resp)
+			if not js_blocks:
+				continue
+			conv_prompt = build_conversion_prompt(js_blocks[0])
+			scad_resp = request_model_completion("You are an expert OpenSCAD engineer.", conv_prompt)
+			scad_blocks = extract_openscad_code_blocks(scad_resp)
+			if not scad_blocks:
+				continue
+			entry = {"name": name, "code": scad_blocks[0]}
+			existing.append(entry)
+			# Persist after each successful entry (progressive)
+			db_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+		except Exception:
+			# Skip failures; do not write partial for failed item
+			continue
+
+	return db_path, existing
+
+
 def main() -> None:
 	objects = get_objects()
 	system_prompt = build_system_prompt()
@@ -170,6 +241,15 @@ def main() -> None:
 			scad_response = request_model_completion("You are an expert OpenSCAD engineer.", conv_prompt)
 			scad_blocks = extract_openscad_code_blocks(scad_response)
 			write_openscad_outputs(obj, three_timestamp, scad_response, scad_blocks)
+
+	# Milestone 3: build animals database if animals.json exists and is valid
+	try:
+		animals = read_animals_list()
+		db_path, _ = build_animals_database(animals)
+		print(str(db_path))
+	except Exception:
+		# If animals.json is absent/invalid, we do not create a DB and do not soften failures elsewhere
+		pass
 
 	print(str(get_output_dir()))
 

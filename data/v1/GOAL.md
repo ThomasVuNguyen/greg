@@ -40,3 +40,12 @@ Deliverable:
 - Openscad files
 
 Status: Done
+
+# Milestone 3:
+
+Using what we know, there is a list of animals in animals.json
+
+Create a database as json format with 2 columns
+
+'name' as the animal name
+'code' as the openscad code

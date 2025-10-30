@@ -1,0 +1,93 @@
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.132.2/examples/jsm/controls/OrbitControls.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf0f0f0);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 0, 5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(1, 1, 1);
+scene.add(directionalLight);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+function createHeadphones() {
+    const headphones = new THREE.Group();
+    
+    // Headband (curved cylinder)
+    const headbandGeometry = new THREE.CylinderGeometry(0.1, 0.1, 2.5, 16);
+    const headbandMaterial = new THREE.MeshPhongMaterial({ color: 0x222222 });
+    const headband = new THREE.Mesh(headbandGeometry, headbandMaterial);
+    headband.rotation.z = Math.PI / 2;
+    headband.position.y = 0.8;
+    headphones.add(headband);
+    
+    // Ear cups (cylinders)
+    const earCupGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.2, 32);
+    const earCupMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+    
+    const leftEarCup = new THREE.Mesh(earCupGeometry, earCupMaterial);
+    leftEarCup.position.set(-1.3, 0.8, 0);
+    headphones.add(leftEarCup);
+    
+    const rightEarCup = new THREE.Mesh(earCupGeometry, earCupMaterial);
+    rightEarCup.position.set(1.3, 0.8, 0);
+    headphones.add(rightEarCup);
+    
+    // Ear cushions (torus)
+    const cushionGeometry = new THREE.TorusGeometry(0.45, 0.05, 16, 32);
+    const cushionMaterial = new THREE.MeshPhongMaterial({ color: 0x111111 });
+    
+    const leftCushion = new THREE.Mesh(cushionGeometry, cushionMaterial);
+    leftCushion.position.set(-1.3, 0.8, 0.1);
+    leftCushion.rotation.x = Math.PI / 2;
+    headphones.add(leftCushion);
+    
+    const rightCushion = new THREE.Mesh(cushionGeometry, cushionMaterial);
+    rightCushion.position.set(1.3, 0.8, 0.1);
+    rightCushion.rotation.x = Math.PI / 2;
+    headphones.add(rightCushion);
+    
+    // Connectors (small cylinders)
+    const connectorGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.3, 16);
+    const connectorMaterial = new THREE.MeshPhongMaterial({ color: 0x222222 });
+    
+    const leftConnector = new THREE.Mesh(connectorGeometry, connectorMaterial);
+    leftConnector.position.set(-1.1, 0.8, 0);
+    leftConnector.rotation.z = Math.PI / 2;
+    headphones.add(leftConnector);
+    
+    const rightConnector = new THREE.Mesh(connectorGeometry, connectorMaterial);
+    rightConnector.position.set(1.1, 0.8, 0);
+    rightConnector.rotation.z = Math.PI / 2;
+    headphones.add(rightConnector);
+    
+    return headphones;
+}
+
+const headphones = createHeadphones();
+scene.add(headphones);
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+animate();
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
